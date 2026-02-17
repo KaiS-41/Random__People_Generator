@@ -1,0 +1,90 @@
+package com.example.rv_random_people
+
+import android.os.Bundle
+import android.util.Log
+import android.widget.TextView
+import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.codepath.asynchttpclient.AsyncHttpClient
+import com.codepath.asynchttpclient.callback.JsonHttpResponseHandler
+import okhttp3.Headers
+
+//needs data class to store info
+data class Person(
+    val name: String,
+    val email: String,
+    val country: String,
+    val imageUrl: String
+)
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var people_list: MutableList<Person>
+    private lateinit var rv_people: RecyclerView
+    private lateinit var adapter: PeopleAdapter
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_main)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
+        rv_people = findViewById(R.id.people_list)
+        people_list = mutableListOf()
+
+        adapter = PeopleAdapter(people_list)
+        rv_people.adapter = adapter
+        rv_people.layoutManager = LinearLayoutManager(this)
+        fetchPeople()
+    }
+
+    //fetches up to 20 results
+    private fun fetchPeople() {
+        val client = AsyncHttpClient()
+        client["https://randomuser.me/api/?results=20", object : JsonHttpResponseHandler() {
+            override fun onSuccess(statusCode: Int, headers: Headers, json: JSON) {
+                try {
+                    val results = json.jsonObject.getJSONArray("results")
+                    people_list.clear()
+
+
+                    for (i in 0 until results.length()) {
+                        val person = results.getJSONObject(i)
+                        val nameObj = person.getJSONObject("name")
+                        val name = "${nameObj.getString("first")} ${nameObj.getString("last")}"
+                        val email = person.getString("email")
+                        val country = person.getJSONObject("location").getString("country")
+                        val imageUrl = person.getJSONObject("picture").getString("large")
+
+                        val personObj = Person(name, email, country, imageUrl)
+                        people_list.add(personObj)
+                    }
+
+                    //must use this as error with booting up the emulator re
+                    runOnUiThread {
+                        adapter.notifyDataSetChanged()
+                    }
+
+                } catch (e: Exception) {
+                    Log.d("API Error", "Error with API", e)
+                }
+            }
+                override fun onFailure(
+                    statusCode: Int,
+                    headers: Headers?,
+                    errorResponse: String,
+                    throwable: Throwable?
+                ) {
+                    Log.d("Person Error", errorResponse)
+                }
+        }]
+    }
+}
